@@ -2,17 +2,9 @@
 
 set -euxo pipefail
 
-# ============================================================
 # Work around OpenJDK cgroup/container metrics crash
 # on current GitHub Actions runners.
-# ============================================================
-
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -XX:-UseContainerSupport"
-
-
-# ============================================================
-# Parse build mode
-# ============================================================
 
 nogvr=false
 
@@ -24,12 +16,6 @@ fi
 
 # ============================================================
 # Rust Android targets
-#
-# ALVR client_core currently attempts to build for:
-#   arm64-v8a
-#   armeabi-v7a
-#   x86_64
-#   x86
 # ============================================================
 
 rustup target add \
@@ -41,46 +27,30 @@ rustup target add \
 
 # ============================================================
 # Prepare ALVR tools
-#
-# IMPORTANT:
-# Do NOT use:
-#
-#   cargo xtask prepare-deps --platform android
-#
-# The old ALVR dependency script downloads obsolete vendor
-# OpenXR loaders, including a dead Lynx download URL.
-#
-# PhoneVR only needs ALVR client_core here.
 # ============================================================
 
 pushd ALVR
 
 git submodule update --init --recursive
 
-
-# ------------------------------------------------------------
-# PhoneVR's ALVR fork uses the old cargo-ndk CLI syntax:
+# PhoneVR's ALVR fork uses the pre-v4 cargo-ndk CLI:
 #
 #   -p 26
 #   --no-strip
 #
-# cargo-ndk 4.x made breaking CLI changes, so we must pin
-# cargo-ndk to the last compatible 3.x release.
-# ------------------------------------------------------------
-
-cargo install cargo-ndk \
-    --version 3.5.7 \
+# cargo-ndk v3.5.7 is yanked from crates.io, so install it
+# directly from its GitHub tag instead.
+cargo install \
+    --git https://github.com/bbqsrc/cargo-ndk \
+    --tag v3.5.7 \
     --locked \
-    --force
+    --force \
+    cargo-ndk
 
-
-# cbindgen is used when ALVR generates the client_core headers.
 cargo install cbindgen \
     --locked \
     --force
 
-
-# Print versions so CI logs clearly show what was installed.
 cargo ndk --version
 cbindgen --version
 
@@ -99,10 +69,7 @@ rm -rf "${CARB_REPO_NAME}"
 rm -f download.zip
 
 
-# ============================================================
 # Download Cardboard SDK source
-# ============================================================
-
 curl \
     --fail \
     --location \
@@ -111,24 +78,14 @@ curl \
     "https://github.com/nift4/cardboard/archive/refs/heads/master.zip" \
     --output download.zip
 
-
-# Verify that GitHub actually returned a valid ZIP.
 unzip -tq download.zip
-
 unzip download.zip
-
 rm -f download.zip
 
 
 # ============================================================
-# Only configure the Cardboard SDK project
-#
-# The Cardboard repository also contains:
-#
-#   :hellocardboard-android
-#
-# That sample project currently fails during Gradle
-# configuration on GitHub Actions. PhoneVR does not need it.
+# Only configure the Cardboard SDK project.
+# Do not configure hellocardboard-android.
 # ============================================================
 
 echo "include ':sdk'" > "${CARB_REPO_NAME}/settings.gradle"
@@ -171,13 +128,7 @@ cp \
     cardboard/cardboard.h
 
 
-# ============================================================
 # Verify Cardboard output
-#
-# Stop here immediately if Cardboard did not produce the
-# expected files. This prevents a confusing Gradle error later.
-# ============================================================
-
 test -f cardboard/cardboard-sdk.aar
 test -f cardboard/cardboard.h
 
@@ -187,19 +138,11 @@ ls -lh cardboard/cardboard-sdk.aar
 ls -lh cardboard/cardboard.h
 echo "============================================"
 
-
-# Cardboard source is no longer needed.
 rm -rf "${CARB_REPO_NAME}"
 
 
 # ============================================================
 # Legacy Google VR SDK
-#
-# noGvr builds do not require this.
-#
-# The existing PhoneVR CI may still invoke this script without
-# "nogvr" later when building the legacy GVR flavor, so retain
-# the original behavior for now.
 # ============================================================
 
 rm -rf "gvr-android-sdk-1.200"
@@ -219,7 +162,6 @@ if [ "$nogvr" != true ]; then
         --output download.zip
 
     unzip -tq download.zip
-
     unzip download.zip
 
     rm -f download.zip
@@ -230,10 +172,6 @@ else
 
 fi
 
-
-# ============================================================
-# Finished
-# ============================================================
 
 echo "============================================"
 echo "PhoneVR dependency preparation completed."
