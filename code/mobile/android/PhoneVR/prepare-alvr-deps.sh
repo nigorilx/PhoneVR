@@ -1,6 +1,10 @@
-if [ "$1" == "nogvr" ]; then
-nogvr=true
-shift
+set -euxo pipefail
+
+nogvr=false
+
+if [ "${1:-}" == "nogvr" ]; then
+    nogvr=true
+    shift
 fi
 
 rustup target add \
@@ -9,45 +13,49 @@ rustup target add \
     x86_64-linux-android \
     i686-linux-android
 
-# # Download ALVR source
-# rm -r "ALVR"
-# curl -sLS "https://github.com/alvr-org/ALVR/archive/refs/heads/master.zip" > download.zip
-# # curl -sLS "https://github.com/ShootingKing-AM/ALVR/archive/refs/heads/phonevr.zip" > download.zip
-# unzip download.zip
-# rm download.zip
-# mv ALVR-master ALVR
-# # mv ALVR-phonevr ALVR
-
+# Prepare ALVR dependencies
 pushd ALVR
 cargo update
-cargo xtask prepare-deps --platform android $@
+cargo xtask prepare-deps --platform android "$@"
 popd
 
-rm -r cardboard
+# Remove old Cardboard build if present
+rm -rf cardboard
 
-# Download sdk source$
+# Download Cardboard SDK source
 CARB_REPO_NAME="cardboard-master"
-rm -r "${CARB_REPO_NAME}"
-# curl -sLS "https://github.com/googlevr/cardboard/archive/refs/heads/master.zip" > download.zip
+rm -rf "${CARB_REPO_NAME}"
+
 curl -sLS "https://github.com/nift4/cardboard/archive/refs/heads/master.zip" > download.zip
 unzip download.zip
 rm download.zip
 
-# Build sdk
+# Build Cardboard SDK
 pushd "${CARB_REPO_NAME}"
+chmod +x ./gradlew
 ./gradlew sdk:assembleRelease -Parm64-v8a
 popd
 
-# Prepare files
-mkdir cardboard
-mv "${CARB_REPO_NAME}/sdk/build/outputs/aar/sdk-release.aar" cardboard/cardboard-sdk.aar
-cp "${CARB_REPO_NAME}/sdk/include/cardboard.h" cardboard/cardboard.h
-rm -r "${CARB_REPO_NAME}"
+# Prepare Cardboard files
+mkdir -p cardboard
 
-rm -r "gvr-android-sdk-1.200"
-if [ ! $nogvr ]; then
-curl -sLS "https://github.com/googlevr/gvr-android-sdk/releases/download/v1.200/gvr-android-sdk-1.200.zip" > download.zip
-unzip download.zip
-rm download.zip
+mv "${CARB_REPO_NAME}/sdk/build/outputs/aar/sdk-release.aar" \
+   cardboard/cardboard-sdk.aar
+
+cp "${CARB_REPO_NAME}/sdk/include/cardboard.h" \
+   cardboard/cardboard.h
+
+# Verify that the AAR really exists
+test -f cardboard/cardboard-sdk.aar
+ls -lh cardboard/cardboard-sdk.aar
+
+rm -rf "${CARB_REPO_NAME}"
+
+# Legacy Google VR SDK is only needed for GVR builds
+rm -rf "gvr-android-sdk-1.200"
+
+if [ "$nogvr" != true ]; then
+    curl -sLS "https://github.com/googlevr/gvr-android-sdk/releases/download/v1.200/gvr-android-sdk-1.200.zip" > download.zip
+    unzip download.zip
+    rm download.zip
 fi
-
