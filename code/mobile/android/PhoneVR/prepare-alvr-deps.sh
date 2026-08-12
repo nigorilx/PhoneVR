@@ -34,7 +34,20 @@ pushd ALVR
 
 git submodule update --init --recursive
 
-cargo install cargo-ndk cbindgen
+# PhoneVR's ALVR fork uses the pre-v4 cargo-ndk CLI:
+#   -p <API>
+#   --no-strip
+# cargo-ndk 4.x changed/removed those options, so pin the
+# latest pre-v4 release.
+cargo install cargo-ndk \
+    --version 3.5.7 \
+    --locked \
+    --force
+
+cargo install cbindgen \
+    --locked
+
+cargo ndk --version
 
 popd
 
