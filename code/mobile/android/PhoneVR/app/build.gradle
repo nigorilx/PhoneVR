@@ -16,21 +16,33 @@ def defaultALVRFlavour = "--release"
 android {
     signingConfigs {
         releaseconfig {
-            if( System.getenv('GITHUB_EVENT_NAME') == 'pull_request' || System.getenv("Store") == null || System.getenv("Key") == null ) {
-                // If its a PR Supply a dummy KeySigningConfig
-                // Or in Local env if Store and Keys are not present in ENV Vars do the same
+            def storeSecret = System.getenv("Store")
+            def keySecret = System.getenv("Key")
+    
+            if (
+                System.getenv('GITHUB_EVENT_NAME') == 'pull_request' ||
+                storeSecret == null ||
+                storeSecret.trim().isEmpty() ||
+                keySecret == null ||
+                keySecret.trim().isEmpty()
+            ) {
+                // Fork / local build without official PhoneVR signing secrets.
+                // Use the repository's dummy signing key.
                 storeFile file("PhoneVRKeyStorePR.jks")
                 storePassword "test1234"
                 keyAlias "PhoneVRKeyPR"
                 keyPassword "test1234"
-                println "[PVR] Configuring releaseconfigs for testing a PR..."
+    
+                println "[PVR] Official signing secrets unavailable; using dummy release signing config."
             }
             else {
+                // Official PhoneVR release signing.
                 storeFile file(keystoreProperties['storeFile'])
-                storePassword System.getenv("Store")
+                storePassword storeSecret
                 keyAlias keystoreProperties['keyAlias']
-                keyPassword System.getenv("Key")
-                println "[PVR] Configuring releaseconfigs for release (push) (not a PR)"
+                keyPassword keySecret
+    
+                println "[PVR] Configuring official release signing."
             }
         }
     }
